@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Collections.Generic;
 
 public class URGScript : MonoBehaviour
 {
@@ -19,14 +20,33 @@ public class URGScript : MonoBehaviour
     public float stepAngle; //角度分解能[deg]
     public float scanTime;  //走査時間[s]
 
+    private int dataSize;
+    private float[][] scanData;
+
     private Ray ray;
     private float timer;    //操作時間調節用タイマー
 
+    private bool scanning = false;
+
+    void initDataArray()
+    {
+        dataSize = 0;
+        for (float angle = minAngle; angle <= maxAngle; angle += stepAngle) dataSize++;
+
+        scanData = new float[2][];
+        scanData[0] = new float[dataSize];  //radian
+        scanData[1] = new float[dataSize];  //distance
+    
+    }
+
     void scan()
     {
-        // 現在の経過時間を取得
-        float check_time = Time.realtimeSinceStartup;
+        Debug.Log("Start scanning");
 
+        // 現在の経過時間を取得
+        //float check_time = Time.realtimeSinceStartup;
+        int count = 0;
+        float dist;
         for (float angle = minAngle; angle <= maxAngle; angle += stepAngle)
         {
             ray = new Ray(transform.position, Quaternion.AngleAxis(angle, -transform.up) * transform.forward);
@@ -36,103 +56,102 @@ public class URGScript : MonoBehaviour
             if (Physics.Raycast(ray, out hit, maxDistance))
             {
                 // Rayの原点から衝突地点までの距離を得る
-                float dis = hit.distance;
-                Debug.Log(dis);
+                dist = hit.distance;
+
+                scanData[0][count] = DegreeToRadian( angle );
+                if (dist >= minDistance) scanData[1][count] = dist;
+                else scanData[1][count] = 0.0f;
+
+                //Debug.Log(dis);
             }
+            else
+            {
+                scanData[0][count] = angle;
+                scanData[1][count] = 0.0f;
+            }
+            count++;
         }
+        scanning = false;
+        //Debug.Log((int)((maxAngle-minAngle)/stepAngle+0.5) +":"+ count);
 
         // 処理完了後の経過時間から、保存していた経過時間を引く＝処理時間
-        check_time = Time.realtimeSinceStartup - check_time;
+        //check_time = Time.realtimeSinceStartup - check_time;
 
-        Debug.Log("check time : " + check_time.ToString("0.00000"));
+        //Debug.Log("check time : " + check_time.ToString("0.00000"));
     }
     
 
 	// Use this for initialization
 	void Start () {
+        initDataArray();
+
+        StartListening();
 	}
 	
 	// Update is called once per frame
 	void Update () {
 
-        timer += Time.deltaTime;
+        //timer += Time.deltaTime;
 
-        if (timer >= scanTime)
+        //if (timer >= scanTime)
+        //{
+        //    timer = 0;
+        //    scan();
+        //}
+
+        if (scanning)
         {
-            timer = 0;
-            scan();
+            scan();        
         }
+
 	}
-}
 
-// State object for reading client data asynchronously
-public class StateObject
-{
-    // Client  socket.
-    public Socket workSocket = null;
-    // Size of receive buffer.
-    public const int BufferSize = 1024;
-    // Receive buffer.
-    public byte[] buffer = new byte[BufferSize];
-    // Received data string.
-    public StringBuilder sb = new StringBuilder();
-}
-//
-// とりあえず断念
-//
-
-public class AsynchronousSocketListener 
-{
-    // Thread signal.
-    public static ManualResetEvent allDone = new ManualResetEvent(false);
-    Socket listener;
-
-    public AsynchronousSocketListener()
+    // State object for reading client data asynchronously
+    public class StateObject
     {
+        // Client  socket.
+        public Socket workSocket = null;
+        // Size of receive buffer.
+        public const int BufferSize = 1024;
+        // Receive buffer.
+        public byte[] buffer = new byte[BufferSize];
+        // Received data string.
+        public StringBuilder sb = new StringBuilder();
     }
 
-    protected void Start()
+    List<StateObject> activeConnections = new List<StateObject>();
+
+    public void StartListening()
     {
-        // Data buffer for incoming data.
-        byte[] bytes = new Byte[1024];
 
         // Establish the local endpoint for the socket.
         // The DNS name of the computer
         // running the listener is "host.contoso.com".
-        IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
-        IPAddress ipAddress = ipHostInfo.AddressList[0];
-        IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
+        IPAddress ipAddress = IPAddress.Parse(GetIPAddress("localhost"));
+        IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 8000);
 
         // Create a TCP/IP socket.
-        listener = new Socket(AddressFamily.InterNetwork,
-            SocketType.Stream, ProtocolType.Tcp);
+        Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
         // Bind the socket to the local endpoint and listen for incoming connections.
-        listener.Bind(localEndPoint);
-        listener.Listen(100);
-        
-    }
+        try
+        {
+            listener.Bind(localEndPoint);
+            listener.Listen(10);
 
-    protected void Update()
-    {
-        // Set the event to nonsignaled state.
-        allDone.Reset();
+            // Start an asynchronous socket to listen for connections.
+            listener.BeginAccept(new AsyncCallback(AcceptCallback), listener);
 
-        // Start an asynchronous socket to listen for connections.
-        Debug.Log("Waiting for a connection...");
-        listener.BeginAccept(
-            new AsyncCallback(AcceptCallback),
-            listener);
+        }
+        catch (Exception e)
+        {
+            Debug.Log(e.ToString());
+        }
 
-        // Wait until a connection is made before continuing.
-        allDone.WaitOne();
     }
 
     public void AcceptCallback(IAsyncResult ar)
     {
-        // Signal the main thread to continue.
-        allDone.Set();
-
         // Get the socket that handles the client request.
         Socket listener = (Socket)ar.AsyncState;
         Socket handler = listener.EndAccept(ar);
@@ -140,8 +159,18 @@ public class AsynchronousSocketListener
         // Create the state object.
         StateObject state = new StateObject();
         state.workSocket = handler;
+
+        //確立した接続のオブジェクトをリストに追加
+        activeConnections.Add(state);
+
+        Debug.LogFormat("there is {0} connections", activeConnections.Count);
+
         handler.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0,
             new AsyncCallback(ReadCallback), state);
+
+        //接続待ちを再開しないと次の接続を受け入れなくなる
+        listener.BeginAccept(new AsyncCallback(AcceptCallback), listener);
+
     }
 
     public void ReadCallback(IAsyncResult ar)
@@ -159,28 +188,69 @@ public class AsynchronousSocketListener
         if (bytesRead > 0)
         {
             // There  might be more data, so store the data received so far.
-            state.sb.Append(Encoding.ASCII.GetString(
-                state.buffer, 0, bytesRead));
+            state.sb.Append(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
 
             // Check for end-of-file tag. If it is not there, read 
             // more data.
             content = state.sb.ToString();
-            if (content.IndexOf("<EOF>") > -1)
+
+            //MSDNのサンプルはEOFを検知して出力をしているけれどもncコマンドはEOFを改行時にLFしか飛ばさないので\nを追加
+            if (content.IndexOf("\n") > -1 || content.IndexOf("<EOF>") > -1)
             {
                 // All the data has been read from the 
                 // client. Display it on the console.
-                Console.WriteLine("Read {0} bytes from socket. \n Data : {1}",
-                    content.Length, content);
+                Debug.LogFormat("Read {0} bytes from socket. \n Data : {1}", content.Length, content);
                 // Echo the data back to the client.
-                Send(handler, content);
+                //Send(handler, content);
+                SendScanDatas(handler);
+
+                //clear data in object before next receive
+                //StringbuilderクラスはLengthを0にしてクリアする
+                state.sb.Length = 0; ;
+
+                // Not all data received. Get more.
+                handler.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0,
+                    new AsyncCallback(ReadCallback), state);
+
             }
             else
             {
                 // Not all data received. Get more.
                 handler.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0,
-                new AsyncCallback(ReadCallback), state);
+                    new AsyncCallback(ReadCallback), state);
             }
         }
+    }
+
+    private void SendScanDatas(Socket handler)
+    {
+        scanning = true;
+        while (scanning) ;
+
+        Debug.Log("Making send data");
+        int typeSize = sizeof(float);
+        byte[] sendData = new byte[dataSize * 2 * typeSize + typeSize];
+        int index = 0;
+
+        foreach (var item in scanData[0])
+        {
+            Array.Copy((BitConverter.GetBytes(item)), 0, sendData, index * typeSize , typeSize);
+            index++;
+        }
+        foreach (var item in scanData[1])
+        {
+            Array.Copy((BitConverter.GetBytes(item)), 0, sendData, index * typeSize, typeSize);
+            index++;
+        }
+        Array.Copy((BitConverter.GetBytes(-1.0f)), 0, sendData, index * typeSize, typeSize);
+
+
+        Debug.Log("sendData:" + sendData.Length);
+        Debug.Log("scanData:" + scanData[0].Length);
+
+        // Begin sending the data to the remote device.
+        handler.BeginSend(sendData, 0, sendData.Length, 0,
+            new AsyncCallback(SendCallback), handler);
     }
 
     private void Send(Socket handler, String data)
@@ -202,15 +272,38 @@ public class AsynchronousSocketListener
 
             // Complete sending the data to the remote device.
             int bytesSent = handler.EndSend(ar);
-            Console.WriteLine("Sent {0} bytes to client.", bytesSent);
+            Debug.LogFormat("Sent {0} bytes to client.", bytesSent);
 
-            handler.Shutdown(SocketShutdown.Both);
-            handler.Close();
+            //この２つはセットでつかるらしい
+            //handler.Shutdown(SocketShutdown.Both);
+            //handler.Close();
 
         }
         catch (Exception e)
         {
-            Console.WriteLine(e.ToString());
+            Debug.Log(e.ToString());
         }
     }
+
+    private string GetIPAddress(string hostname)
+    {
+        IPHostEntry host;
+        host = Dns.GetHostEntry(hostname);
+
+        foreach (IPAddress ip in host.AddressList)
+        {
+            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                //System.Diagnostics.Debug.WriteLine("LocalIPadress: " + ip);
+                return ip.ToString();
+            }
+        }
+        return string.Empty;
+    }
+
+    private float DegreeToRadian(float deg)
+    {
+        return deg * Mathf.PI / 180;
+    }
+
 }
