@@ -45,6 +45,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+     <Compile Include="Assets\Scripts\RobotScript.cs" />
      <Compile Include="Assets\Scripts\URGScript.cs" />
      <Compile Include="Assets\Scripts\tcp_ip_test.cs" />
  <Reference Include="UnityEngine.UI">
