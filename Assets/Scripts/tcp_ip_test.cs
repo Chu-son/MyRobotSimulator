@@ -34,21 +34,10 @@ public class tcp_ip_test : MonoBehaviour
  
 	List<StateObject> activeConnections = new List<StateObject>();
  
-	public void StartListening() {
-	
-		// Data buffer for incoming data.
-		//って書いてるけど使ってないのでコメントアウト
-		//byte[] bytes = new Byte[1024];
- 
+	public void StartListening() { 
 		// Establish the local endpoint for the socket.
 		// The DNS name of the computer
 		// running the listener is "host.contoso.com".
- 
-		//この表現だとResolveがobsoleteだと注意されるのでGetHostEntryやGetIPAddressを使う
-        //IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
-        //IPAddress ipAddress = ipHostInfo.AddressList[0];
-        //IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 8000);
-
 		IPAddress ipAddress = IPAddress.Parse(GetIPAddress("localhost"));
 		IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 8000);
  
@@ -103,7 +92,6 @@ public class tcp_ip_test : MonoBehaviour
 		// Read data from the client socket. 
 		int bytesRead = handler.EndReceive(ar);
 
-        Debug.Log("read");
 		if (bytesRead > 0) {
 			// There  might be more data, so store the data received so far.
 			state.sb.Append(Encoding.ASCII.GetString(state.buffer,0,bytesRead));
