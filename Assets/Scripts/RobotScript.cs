@@ -5,9 +5,22 @@ public class RobotScript : MonoBehaviour {
     public float transformSpeed;
     public float rotateSpeed;
 
+    private Vector3 pos;
+    private Vector3 direction;
+
+    private bool updateing;
+
+    public Vector3[] GetMovement()
+    {
+        return new Vector3[]{ pos,direction };
+    }
+
 	// Use this for initialization
 	void Start () {
-	
+        pos = transform.position;
+        direction = transform.eulerAngles;
+
+        updateing = false;
 	}
 	
 	// Update is called once per frame
@@ -28,6 +41,8 @@ public class RobotScript : MonoBehaviour {
         {
             transform.position += transform.forward * -transformSpeed;
         }
+        pos = transform.position;
+        direction = transform.eulerAngles;
 	
 	}
 }
