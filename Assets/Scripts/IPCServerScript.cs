@@ -130,6 +130,7 @@ public class IPCServerScript : MonoBehaviour
                  *  "lrf [LRFオブジェクトの識別名]" : LRFスキャンデータの要求    
                  *  "move ["get" or "send"] [if "send" [direction] [value] ]" : 移動情報の送受信
                  *      direction : forward, right, left, back
+                 *  "hit" : 衝突しているオブジェクトの数を要求
                  */
                 string[] commandArray = content.Split(' ');
                 foreach (var item in commandArray)
@@ -151,7 +152,7 @@ public class IPCServerScript : MonoBehaviour
                                 break;
 
                             case "send":
-                                ApplyMovementCommand( commandArray[2] , float.Parse(commandArray[3]) );
+                                ApplyMovementCommand( commandArray[2] , float.Parse(commandArray[3]), handler );
                                 break;
 
                             default:
@@ -161,6 +162,10 @@ public class IPCServerScript : MonoBehaviour
 
                         break;
 
+                    case "hit":
+                        SendHitCount(handler);
+                        break;
+
                     default:
                         // send error
                         break;
@@ -168,7 +173,7 @@ public class IPCServerScript : MonoBehaviour
 
                 //clear data in object before next receive
                 //StringbuilderクラスはLengthを0にしてクリアする
-                state.sb.Length = 0; ;
+                state.sb.Length = 0;
 
                 // Not all data received. Get more.
                 handler.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0,
@@ -204,7 +209,7 @@ public class IPCServerScript : MonoBehaviour
             Array.Copy((BitConverter.GetBytes(item)), 0, sendData, index * typeSize, typeSize);
             index++;
         }
-        Array.Copy((BitConverter.GetBytes(-1.0f)), 0, sendData, index * typeSize, typeSize);
+        Array.Copy((BitConverter.GetBytes(-1000.0f)), 0, sendData, index * typeSize, typeSize);
 
 
         Debug.Log("sendData:" + sendData.Length);
@@ -232,7 +237,7 @@ public class IPCServerScript : MonoBehaviour
             Array.Copy((BitConverter.GetBytes(item)), 0, sendData, index * typeSize, typeSize);
             index++;
         }
-        Array.Copy((BitConverter.GetBytes(-1.0f)), 0, sendData, index * typeSize, typeSize);
+        Array.Copy((BitConverter.GetBytes(-1000.0f)), 0, sendData, index * typeSize, typeSize);
 
         Debug.Log("sendData:" + sendData.Length);
 
@@ -241,9 +246,28 @@ public class IPCServerScript : MonoBehaviour
             new AsyncCallback(SendCallback), handler);
 
     }
-    private void ApplyMovementCommand(string direction , float val)
+    private void ApplyMovementCommand(string direction, float val, Socket handler)
     {
+        robotscript.isAcceptKeyboard = false;
+        robotscript.DrivingInstruction(direction, val);
 
+        byte[] sendData = BitConverter.GetBytes(-1000.0f);
+        // Begin sending the data to the remote device.
+        handler.BeginSend(sendData, 0, sendData.Length, 0,
+            new AsyncCallback(SendCallback), handler);
+    }
+    private void SendHitCount(Socket handler)
+    {
+        int typeSize = sizeof(float);
+        byte[] sendData = new byte[typeSize * 2];
+        int index = 0;
+        Array.Copy( ( BitConverter.GetBytes( (float)robotscript.HitCount ) ), 0, sendData, index * typeSize, typeSize);
+        index++;
+        Array.Copy((BitConverter.GetBytes(-1000.0f)), 0, sendData, index * typeSize, typeSize);
+
+        // Begin sending the data to the remote device.
+        handler.BeginSend(sendData, 0, sendData.Length, 0,
+            new AsyncCallback(SendCallback), handler);
     }
 
     private void Send(Socket handler, String data)
