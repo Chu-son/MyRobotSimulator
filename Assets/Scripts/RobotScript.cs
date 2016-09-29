@@ -39,10 +39,10 @@ public class RobotScript : MonoBehaviour {
 	void Update () {
         if (isAcceptKeyboard)
         {
-            if (Input.GetKey("right"))      transform.eulerAngles += new Vector3(0f, rotateSpeed, 0f);
-            else if (Input.GetKey("left"))  transform.eulerAngles += new Vector3(0f, -rotateSpeed, 0f);
-            else if (Input.GetKey("up"))    transform.position += transform.forward * transformSpeed;
-            else if (Input.GetKey("down"))  transform.position += transform.forward * -transformSpeed;
+            if (Input.GetKey("right"))      transform.eulerAngles += new Vector3(0f, rotateSpeed * Time.deltaTime, 0f);
+            else if (Input.GetKey("left"))  transform.eulerAngles += new Vector3(0f, -rotateSpeed * Time.deltaTime, 0f);
+            else if (Input.GetKey("up"))    transform.position += transform.forward * transformSpeed * Time.deltaTime;
+            else if (Input.GetKey("down"))  transform.position += transform.forward * -transformSpeed * Time.deltaTime;
         }
         else
         {

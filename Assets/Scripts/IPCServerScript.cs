@@ -16,6 +16,22 @@ public class IPCServerScript : MonoBehaviour
     private URGScript urgscript;
     private RobotScript robotscript;
 
+    private static bool isCreated = false;
+
+    void Awake()
+    {
+        if(isCreated)
+        {
+            Destroy(this);
+        }
+        else
+        {
+            DontDestroyOnLoad(this); // シーン読み込みの際に破棄されなくなる
+            isCreated = true;
+        }
+        
+    }
+
     // Use this for initialization
     void Start()
     {
@@ -139,10 +155,12 @@ public class IPCServerScript : MonoBehaviour
                 }
                 switch (commandArray[0])
                 {
+                    // 測域センサの点群情報を送信
                     case "lrf":
                         SendLRFScanData(commandArray[1] , handler);
                         break;
 
+                    // 移動情報の送受信
                     case "move":
 
                         switch (commandArray[1])
@@ -162,6 +180,8 @@ public class IPCServerScript : MonoBehaviour
 
                         break;
 
+                    // 衝突しているオブジェクトの個数を送信
+                    // 強化学習用だっけ？（用途忘れた）
                     case "hit":
                         SendHitCount(handler);
                         break;
@@ -192,10 +212,12 @@ public class IPCServerScript : MonoBehaviour
     private void SendLRFScanData(string name, Socket handler)
     {
         Debug.Log("SendLRFScanData");
+
         float[][] scanData = urgscript.GetScanData();
 
         Debug.Log("Making send data");
         int typeSize = sizeof(float);
+        // 角度+距離+終了文字
         byte[] sendData = new byte[urgscript.DataSize * 2 * typeSize + typeSize];
         int index = 0;
 
@@ -223,6 +245,7 @@ public class IPCServerScript : MonoBehaviour
     private void SendMovementState(Socket handler )
     {
         Debug.Log("SendMovementState");
+        // [pos, direction]
         Vector3[] vec = robotscript.GetMovement();
 
         Debug.Log("Making send data");
