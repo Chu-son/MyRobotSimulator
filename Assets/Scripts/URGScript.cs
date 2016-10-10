@@ -45,7 +45,7 @@ public class URGScript : MonoBehaviour {
         {
             ray = new Ray(transform.position, Quaternion.AngleAxis(angle, -transform.up) * transform.forward);
             // Rayの可視化
-            Debug.DrawRay(ray.origin, ray.direction, Color.red, 0.1f);
+            Debug.DrawRay(ray.origin, ray.direction, Color.red, 0.2f);
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit, maxDistance))
             {
@@ -54,13 +54,13 @@ public class URGScript : MonoBehaviour {
 
                 scanData[0][count] = DegreeToRadian(angle);
                 if (dist >= minDistance) scanData[1][count] = dist;
-                else scanData[1][count] = 0.0f;
+                else scanData[1][count] = 0.1f;
 
                 //Debug.Log(dis);
             }
             else
             {
-                scanData[0][count] = angle;
+                scanData[0][count] = DegreeToRadian(angle);
                 scanData[1][count] = 0.0f;
             }
             count++;
