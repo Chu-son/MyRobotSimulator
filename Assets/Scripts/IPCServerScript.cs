@@ -144,8 +144,14 @@ public class IPCServerScript : MonoBehaviour
 
                 /*
                  *  "lrf [LRFオブジェクトの識別名]" : LRFスキャンデータの要求    
-                 *  "move ["get" or "send"] [if "send" [direction] [value] ]" : 移動情報の送受信
+                 *  
+                 *  "move ["get" or "send"] 
+                 *          [ if "send" ["send mode"] [if "direction" [direction] [value] [speed] [tolerance] else if "coordinate"  ] ]
+                 *          [ if "get" ["get mode"] " : 移動情報の送受信
+                 *      send mode : direction, coordinate
+                 *      get mode : coordinate, isdriving
                  *      direction : forward, right, left, back
+                 *      
                  *  "hit" : 衝突しているオブジェクトの数を要求
                  */
                 string[] commandArray = content.Split(' ');
@@ -164,13 +170,31 @@ public class IPCServerScript : MonoBehaviour
                     case "move":
 
                         switch (commandArray[1])
-	                    {
+                        {
                             case "get":
-                                SendMovementState( handler );
+                                switch (commandArray[2])
+                                {
+                                    case "coordinate":
+                                        SendMovementState(handler);
+                                        break;
+
+                                    case "isdriving":
+                                        SendIsDriving(handler);
+                                        break;
+                                }
                                 break;
 
                             case "send":
-                                ApplyMovementCommand( commandArray[2] , float.Parse(commandArray[3]), handler );
+                                switch(commandArray[2])
+                                {
+                                    case "direction":
+                                        ApplyMovementCommand(commandArray[3], float.Parse(commandArray[4]), float.Parse(commandArray[5]), float.Parse(commandArray[6]), handler);
+                                        break;
+
+                                    case "coordinate":
+                                        break;
+                                }
+                                
                                 break;
 
                             default:
@@ -269,10 +293,40 @@ public class IPCServerScript : MonoBehaviour
             new AsyncCallback(SendCallback), handler);
 
     }
-    private void ApplyMovementCommand(string direction, float val, Socket handler)
+    private void SendIsDriving(Socket handler)
+    {
+        Debug.Log("SendIsDriving");
+        float isDriving;
+        if (robotscript.IsDriving()) isDriving = 1;
+        else isDriving = 0;
+        
+        Debug.Log("Making send data");
+        int typeSize = sizeof(float);
+        byte[] sendData = new byte[1 * typeSize + typeSize];
+        int index = 0;
+
+        float[] data = new float[] { isDriving };
+
+        foreach (var item in data)
+        {
+            Array.Copy((BitConverter.GetBytes(item)), 0, sendData, index * typeSize, typeSize);
+            index++;
+        }
+        Array.Copy((BitConverter.GetBytes(-1000.0f)), 0, sendData, index * typeSize, typeSize);
+
+        Debug.Log("sendData:" + sendData.Length);
+
+        // Begin sending the data to the remote device.
+        handler.BeginSend(sendData, 0, sendData.Length, 0,
+            new AsyncCallback(SendCallback), handler);
+
+    }
+
+    // [m or degree], [ m/s ], [ m or degree ]
+    private void ApplyMovementCommand(string direction, float val, float speed, float tolerance, Socket handler)
     {
         robotscript.isAcceptKeyboard = false;
-        robotscript.DrivingInstruction(direction, val);
+        robotscript.DrivingInstruction(direction, val, speed, tolerance);
 
         byte[] sendData = BitConverter.GetBytes(-1000.0f);
         // Begin sending the data to the remote device.
