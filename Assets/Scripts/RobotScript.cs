@@ -6,6 +6,7 @@ public class RobotScript : MonoBehaviour {
     public float rotateSpeed;
 
     public bool isAcceptKeyboard;
+    public bool isNoisy;
 
     private Vector3 prejudicePos;
     private Vector3 prejudiceDirection;
@@ -180,8 +181,11 @@ public class RobotScript : MonoBehaviour {
                     prejudicePos += delta;
                     break;
             }
-            
-            transform.eulerAngles += new Vector3(0f, -1 * Time.deltaTime, 0f); // ノイズ的なの
+
+            if (isNoisy && !drivingCommand.Equals("stop"))
+            {
+                transform.eulerAngles += new Vector3(0f, -1 * Time.deltaTime, 0f); // ノイズ的なの
+            }
 
             CheckDrivingEnd();
         }
